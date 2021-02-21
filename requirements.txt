@@ -18,6 +18,7 @@ cryptography @ file:///D:/bld/cryptography_1610338903728/work
 cycler==0.10.0
 decorator==4.4.2
 ffmpeg-python==0.2.0
+freeze==3.0
 future @ file:///D:/bld/future_1610147365175/work
 gast==0.2.2
 google-auth @ file:///home/conda/feedstock_root/build_artifacts/google-auth_1608136875028/work

@@ -31,7 +31,6 @@ def main():
     # Figure out where we are
     working = str((os.getcwdb()))
     try:
-        os.system("color 0D")
         os.system("title Spleeter GUI by Dozza")
         print("""  
          ██████  ██▓███   ██▓    ▓█████ ▓█████▄▄▄█████▓▓█████  ██▀███  
@@ -116,17 +115,17 @@ def main():
         # arguments.offset = 0.0
         # arguments.output_path = 'audio_output'
         arguments.verbose = False
-        # print(f"Loaded {tail} from {head}")
-        # print("Processing...", end='')
-        # enable_logging()
-        # if arguments.verbose:
-        #     enable_tensorflow_logging()
-        # if arguments.command == 'separate':
-        #     from spleeter.commands.separate import entrypoint
-        # params = load_configuration(arguments.configuration)
-        # print("Spleeting...",end="")
-        # entrypoint(arguments, params)
-        # print("Done!")
+        print(f"Loaded {tail} from {head}")
+        print("Processing...", end='')
+        enable_logging()
+        if arguments.verbose:
+            enable_tensorflow_logging()
+        if arguments.command == 'separate':
+            from spleeter.commands.separate import entrypoint
+        params = load_configuration(arguments.configuration)
+        print("Spleeting...",end="")
+        entrypoint(arguments, params)
+        print("Done!")
 
         #remove the downloaded mp3 afterwards
         if mode == "2":
@@ -160,6 +159,8 @@ def main():
             print(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
             time.sleep(1)
 
+        time.sleep(5)
+
         print("-- Both pipes exist.  Good.")
 
         TOFILE = open(TONAME, 'w')
@@ -192,19 +193,15 @@ def main():
             print("Rcvd: <<< \n" + response)
             return response
 
-        def quick_test():
-            """Example list of commands."""
-            do_command('Help: Command=Help')
-            do_command('Help: Command="GetInfo"')
-            #do_command('SetPreference: Name=GUI/Theme Value=classic Reload=1')
-
-        quick_test()
+        
         # construct import paths for audio
         importPath = working[2:-1] + '/' + arguments.output_path + '/' + tail[0:-4] + '/'
         importPath = os.path.normpath(importPath)
         do_command('Import2: Filename="' + os.path.join(importPath,'bass.mp3"'))
-        print(get_response())
-
+        do_command('Import2: Filename="' + os.path.join(importPath,'vocals.mp3"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,'piano.mp3"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,'other.mp3"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,'drums.mp3"'))
    
         # Imported!
         print("files imported successfully...")

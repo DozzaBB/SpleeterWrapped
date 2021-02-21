@@ -1,0 +1,4 @@
+/.vscode/settings.json
+/__pycache__/
+/audio_output/
+/pretrained_models/
