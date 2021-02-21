@@ -1,3 +1,3 @@
-call conda activate py37
+call conda activate py36
 python "spleeter wrapped.py"
 pause
