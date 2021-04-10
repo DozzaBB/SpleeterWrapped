@@ -95,7 +95,7 @@ def main():
                 ydl.download([link])
             # the mp3 should be present in the working directory now.
             # rename the mp3 to the searchterm  (which is 100% of the time a shorter and safer sequence of characters guaranteed!
-            os.rename(searchnames[int(picked)] + ".mp3", searchterm + ".mp3")
+            os.rename(searchnames[int(picked)].replace("?","") + ".mp3", searchterm + ".mp3")
             filename = os.getcwd() + "/" + searchterm + ".mp3"
         #
         print(filename)
