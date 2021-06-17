@@ -9,7 +9,7 @@ acquire via:
 * clone this repo into your conda env
 * conda install -c conda-forge spleeter
 * pip install youtube-dl
-* pip install youtubesearchpython
+* pip install youtube-search-python
 * install FFmpeg binary https://lame.buanzo.org/#lamewindl
 
 This program should automagically install the spleeter 5stems:16khz model on first run, but if you cant get it to work, try downloading it from an external source or running spleeter from the base source to install the model.
