@@ -26,6 +26,15 @@ __author__ = 'Deezer Research'
 __license__ = 'MIT License'
 
 AUDACITY_PATH = "C:\\Program Files (x86)\\Audacity\\audacity.exe"
+DISALLOWED_CHARS = '\\/:*?"<>|'
+
+def sanitize(word):
+    input_letters = list(word)
+    for index in range(len(input_letters)):
+        if input_letters[index] in DISALLOWED_CHARS:
+            input_letters[index] = '_'
+    return ''.join(input_letters)
+
 
 def main():
     # Figure out where we are
@@ -61,26 +70,24 @@ def main():
         if mode == "2":
             # input the search term for VideosSearch, store the top 10 results by name and Url
             searchterm = input("Enter search term:")
-            videosearch = VideosSearch(searchterm, limit=10)
-            searchnames = []
-            searchoptions = []  # empty list for URLs.
-
-            #escape the weird dictionary object we get as a result
-            results = videosearch.result()["result"]
+            search = VideosSearch(searchterm, limit=10).result()["result"]
+            results = []
+            # Unpack the videosearch generator.
+            for i,x in enumerate(search):
+                results.append(x)
 
             #parse the results of the search into useful parameters.
-            for index,x in enumerate(results):
-                print(f"Result {index}: {x['title']}, {x['link']}")
-                searchoptions.append(x["link"])
-                searchnames.append((x["title"] + "-" + x["id"]).replace("/", "_"))
+            for index, result in enumerate(results):
+                print(f"Result {index}: {result['title']}, {result['duration']}")
 
-            # choose which result to go forward with.
-            notpicked = True
-            while (notpicked):
-                picked = input("Which option would you like to pick?\n")
-                if 0 <= int(picked) < 10:
-                    notpicked = False
-            link = searchoptions[int(picked)]
+
+            # Choose a result.
+            while True:
+                selected_option = input("Which option would you like to pick?\n")
+                if  0 <= int(selected_option) < 10:
+                    break
+
+            selected_result = results[int(selected_option)]
 
             # setup for youtube downloader. we can use high quality here since it is volatile and spleeter
             ydl_opts = {
@@ -90,14 +97,19 @@ def main():
                     'preferredcodec': 'mp3',
                     'preferredquality': '320',
                 }],
+                'verbose': True,
+                'outtmpl': '%(title)s.%(ext)s'
             }
             with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([link])
+                print(ydl.prepare_filename(selected_result))
+                ydl.download([selected_result['link']])
             # the mp3 should be present in the working directory now.
             # rename the mp3 to the searchterm  (which is 100% of the time a shorter and safer sequence of characters guaranteed!
-            os.rename(searchnames[int(picked)].replace("?","") + ".mp3", searchterm + ".mp3")
-            filename = os.getcwd() + "/" + searchterm + ".mp3"
+            downloaded_filename = f"{sanitize(selected_result['title'])}.mp3"
+
+            filename = os.path.join(os.getcwd(),downloaded_filename)
         #
+        print("Filename on next line!!!!")
         print(filename)
         if filename is "":
             # avoid errors when quitting the spleeter GUI
@@ -114,7 +126,7 @@ def main():
         arguments.filename_format = '{filename}/{instrument}.{codec}'
         # arguments.offset = 0.0
         # arguments.output_path = 'audio_output'
-        arguments.verbose = False
+        arguments.verbose = True
         print(f"Loaded {tail} from {head}")
         print("Processing...", end='')
         enable_logging()
