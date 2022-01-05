@@ -1,16 +1,15 @@
 from __future__ import unicode_literals
 
+import logging
+logging.basicConfig(level=logging.DEBUG)
+
+
 import sys
 import time
 import youtube_dl
 from youtubesearchpython import VideosSearch
 import warnings
-import shutil
-import subprocess
 import os
-from tempfile import gettempdir
-from os.path import exists, join
-import tkinter
 from tkinter import filedialog
 from tkinter import *
 from spleeter import SpleeterError
@@ -26,22 +25,13 @@ __author__ = 'Deezer Research'
 __license__ = 'MIT License'
 
 AUDACITY_PATH = "C:\\Program Files (x86)\\Audacity\\audacity.exe"
-DISALLOWED_CHARS = '\\/:*?"<>|'
-
-def sanitize(word):
-    input_letters = list(word)
-    for index in range(len(input_letters)):
-        if input_letters[index] in DISALLOWED_CHARS:
-            input_letters[index] = '_'
-    return ''.join(input_letters)
-
 
 def main():
     # Figure out where we are
     working = str((os.getcwdb()))
     try:
         os.system("title Spleeter GUI by Dozza")
-        print("""  
+        logging.info("""  
          ██████  ██▓███   ██▓    ▓█████ ▓█████▄▄▄█████▓▓█████  ██▀███  
         ▒██    ▒ ▓██░  ██▒▓██▒    ▓█   ▀ ▓█   ▀▓  ██▒ ▓▒▓█   ▀ ▓██ ▒ ██▒
         ░ ▓██▄   ▓██░ ██▓▒▒██░    ▒███   ▒███  ▒ ▓██░ ▒░▒███   ▓██ ░▄█ ▒
@@ -55,9 +45,9 @@ def main():
         # Leave this code here cos it gives us a nice default argument to then parse shit into
         mode = ""
         while mode not in ["1", "2"]:
-            mode = input("Which mode would you like?\n"
-                         "1. Spleeter from MP3 file\n"
-                         "2. Search youtube and download mp3 from top 10 list.")
+            mode = input("\nWhich mode would you like?\n"
+                         "    1. Spleeter from MP3 file\n"
+                         "    2. Search youtube and download mp3 from top 10 list.")
         if mode == "1":  # Spleeter from mp3 mode.
             # make a TK instance and minimise it, ask for a file name to return to spleeter, then exit.
             root = Tk()
@@ -78,7 +68,7 @@ def main():
 
             #parse the results of the search into useful parameters.
             for index, result in enumerate(results):
-                print(f"Result {index}: {result['title']}, {result['duration']}")
+                print(f"    Result {index}: {result['title']}, {result['duration']}")
 
 
             # Choose a result.
@@ -101,16 +91,22 @@ def main():
                 'outtmpl': '%(title)s.%(ext)s'
             }
             with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                print(ydl.prepare_filename(selected_result))
+                downloaded_filename = ydl.prepare_filename(selected_result)[:-3] + '.mp3'
+                logging.info(f"Saving file as {downloaded_filename}")
                 ydl.download([selected_result['link']])
             # the mp3 should be present in the working directory now.
-            # rename the mp3 to the searchterm  (which is 100% of the time a shorter and safer sequence of characters guaranteed!
-            downloaded_filename = f"{sanitize(selected_result['title'])}.mp3"
+            # get the filename 
 
             filename = os.path.join(os.getcwd(),downloaded_filename)
+            if not os.path.isfile(filename):
+                root = Tk()
+                root.withdraw()
+                filename = filedialog.askopenfilename(initialdir=os.cwd(),
+                                                    title="Select file",
+                                                    filetypes=(("supporter audio", ".mp3 .wav "), ("all files", ".*")))
+                root.destroy()
         #
-        print("Filename on next line!!!!")
-        print(filename)
+        logging.debug(f"Output full path: {filename}")
         if filename is "":
             # avoid errors when quitting the spleeter GUI
             sys.exit(0)
@@ -127,17 +123,17 @@ def main():
         # arguments.offset = 0.0
         # arguments.output_path = 'audio_output'
         arguments.verbose = True
-        print(f"Loaded {tail} from {head}")
-        print("Processing...", end='')
+        logging.debug(f"Loaded {tail} from {head}")
+        logging.debug("Processing...")
         enable_logging()
         if arguments.verbose:
             enable_tensorflow_logging()
         if arguments.command == 'separate':
             from spleeter.commands.separate import entrypoint
         params = load_configuration(arguments.configuration)
-        print("Spleeting...",end="")
+        logging.info("Spleeting...")
         entrypoint(arguments, params)
-        print("Done!")
+        logging.info("Done!")
 
         #remove the downloaded mp3 afterwards
         if mode == "2":
@@ -150,40 +146,40 @@ def main():
         # audacity time
         os.startfile(AUDACITY_PATH)
         if sys.platform == 'win32':
-            print("pipe-test.py, running on windows")
+            logging.debug("pipe-test.py, running on windows")
             TONAME = '\\\\.\\pipe\\ToSrvPipe'
             FROMNAME = '\\\\.\\pipe\\FromSrvPipe'
             EOL = '\r\n\0'
         else:
-            print("pipe-test.py, running on linux or mac")
+            logging.debug("pipe-test.py, running on linux or mac")
             TONAME = '/tmp/audacity_script_pipe.to.' + str(os.getuid())
             FROMNAME = '/tmp/audacity_script_pipe.from.' + str(os.getuid())
             EOL = '\n'
 
-        print("Write to  \"" + TONAME +"\"")
+        logging.debug("Write to  \"" + TONAME +"\"")
         while not os.path.exists(TONAME):
-            print(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
+            logging.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
             time.sleep(1)
 
 
-        print("Read from \"" + FROMNAME +"\"")
+        logging.debug("Read from \"" + FROMNAME +"\"")
         while not os.path.exists(FROMNAME):
-            print(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
+            logging.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
             time.sleep(1)
 
         time.sleep(5)
 
-        print("-- Both pipes exist.  Good.")
+        logging.debug("-- Both pipes exist.  Good.")
 
         TOFILE = open(TONAME, 'w')
-        print("-- File to write to has been opened")
+        logging.debug("-- File to write to has been opened")
         FROMFILE = open(FROMNAME, 'rt')
-        print("-- File to read from has now been opened too\r\n")
+        logging.debug("-- File to read from has now been opened too\r\n")
 
 
         def send_command(command):
             """Send a single command."""
-            print("Send: >>> \n"+command)
+            logging.debug("Send: >>> \n"+command)
             TOFILE.write(command + EOL)
             TOFILE.flush()
 
@@ -202,7 +198,7 @@ def main():
             """Send one command, and return the response."""
             send_command(command)
             response = get_response()
-            print("Rcvd: <<< \n" + response)
+            logging.debug("Rcvd: <<< \n" + response)
             return response
 
         
@@ -216,7 +212,7 @@ def main():
         do_command('Import2: Filename="' + os.path.join(importPath,'drums.mp3"'))
    
         # Imported!
-        print("files imported successfully...")
+        logging.info("files imported successfully...")
         sys.exit(1)
 
 
