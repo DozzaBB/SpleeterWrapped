@@ -1,185 +1,234 @@
 from __future__ import unicode_literals
 
+# Logging Setup
 import logging
-logging.basicConfig(level=logging.DEBUG)
+from unittest import result
+ch = logging.StreamHandler()
+logger = logging.getLogger("prog")
+logger.addHandler(ch)
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
 
 
 import sys
 import time
 import youtube_dl
+import tkinter
+from tkinter import filedialog
 from youtubesearchpython import VideosSearch
 import warnings
 import os
-from tkinter import filedialog
-from tkinter import *
-from spleeter import SpleeterError
+from spleeter.commands.separate import entrypoint
 from spleeter.commands import create_argument_parser
 from spleeter.utils.configuration import load_configuration
 from spleeter.utils.logging import (
     enable_logging,
     enable_tensorflow_logging,
-    get_logger)
+    )
 
 __email__ = 'research@deezer.com'
 __author__ = 'Deezer Research'
 __license__ = 'MIT License'
 
+bootlogo = """  
+ ██████  ██▓███   ██▓    ▓█████ ▓█████▄▄▄█████▓▓█████  ██▀███  
+▒██    ▒ ▓██░  ██▒▓██▒    ▓█   ▀ ▓█   ▀▓  ██▒ ▓▒▓█   ▀ ▓██ ▒ ██▒
+░ ▓██▄   ▓██░ ██▓▒▒██░    ▒███   ▒███  ▒ ▓██░ ▒░▒███   ▓██ ░▄█ ▒
+  ▒   ██▒▒██▄█▓▒ ▒▒██░    ▒▓█  ▄ ▒▓█  ▄░ ▓██▓ ░ ▒▓█  ▄ ▒██▀▀█▄  
+▒██████▒▒▒██▒ ░  ░░██████▒░▒████▒░▒████▒ ▒██▒ ░ ░▒████▒░██▓ ▒██▒
+▒ ▒▓▒ ▒ ░▒▓▒░ ░  ░░ ▒░▓  ░░░ ▒░ ░░░ ▒░ ░ ▒ ░░   ░░ ▒░ ░░ ▒▓ ░▒▓░
+░ ░▒  ░ ░░▒ ░     ░ ░ ▒  ░ ░ ░  ░ ░ ░  ░   ░     ░ ░  ░  ░▒ ░ ▒░
+░  ░  ░  ░░         ░ ░      ░      ░    ░         ░     ░░   ░ 
+      ░               ░  ░   ░  ░   ░  ░           ░  ░   ░ """
+
 AUDACITY_PATH = "C:\\Program Files (x86)\\Audacity\\audacity.exe"
 
-def main():
-    # Figure out where we are
-    working = str((os.getcwdb()))
-    try:
-        os.system("title Spleeter GUI by Dozza")
-        logging.info("""  
-         ██████  ██▓███   ██▓    ▓█████ ▓█████▄▄▄█████▓▓█████  ██▀███  
-        ▒██    ▒ ▓██░  ██▒▓██▒    ▓█   ▀ ▓█   ▀▓  ██▒ ▓▒▓█   ▀ ▓██ ▒ ██▒
-        ░ ▓██▄   ▓██░ ██▓▒▒██░    ▒███   ▒███  ▒ ▓██░ ▒░▒███   ▓██ ░▄█ ▒
-          ▒   ██▒▒██▄█▓▒ ▒▒██░    ▒▓█  ▄ ▒▓█  ▄░ ▓██▓ ░ ▒▓█  ▄ ▒██▀▀█▄  
-        ▒██████▒▒▒██▒ ░  ░░██████▒░▒████▒░▒████▒ ▒██▒ ░ ░▒████▒░██▓ ▒██▒
-        ▒ ▒▓▒ ▒ ░▒▓▒░ ░  ░░ ▒░▓  ░░░ ▒░ ░░░ ▒░ ░ ▒ ░░   ░░ ▒░ ░░ ▒▓ ░▒▓░
-        ░ ░▒  ░ ░░▒ ░     ░ ░ ▒  ░ ░ ░  ░ ░ ░  ░   ░     ░ ░  ░  ░▒ ░ ▒░
-        ░  ░  ░  ░░         ░ ░      ░      ░    ░         ░     ░░   ░ 
-              ░               ░  ░   ░  ░   ░  ░           ░  ░   ░ 
-        GUI by Dozza""")
-        # Leave this code here cos it gives us a nice default argument to then parse shit into
-        mode = ""
-        while mode not in ["1", "2"]:
-            mode = input("\nWhich mode would you like?\n"
-                         "    1. Spleeter from MP3 file\n"
-                         "    2. Search youtube and download mp3 from top 10 list.")
-        if mode == "1":  # Spleeter from mp3 mode.
-            # make a TK instance and minimise it, ask for a file name to return to spleeter, then exit.
-            root = Tk()
-            root.withdraw()
-            filename = filedialog.askopenfilename(initialdir=os.environ["HOMEPATH"] + "/Desktop",
+ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '320',
+            }],
+            'verbose': True,
+            'outtmpl': '%(title)s.%(ext)s'
+        }
+
+TONAME = '\\\\.\\pipe\\ToSrvPipe'
+FROMNAME = '\\\\.\\pipe\\FromSrvPipe'
+EOL = '\r\n\0'
+
+
+
+
+
+class SpleeterGUI:
+    def __init__(self):
+        # You cant have tkinter Variables without fucking intantiating tkinter first...
+        self.root = tkinter.Tk()
+        self.root.withdraw()
+        # Init all the damn variables.
+        self.working = str((os.getcwdb()))
+        self.open_audacity = tkinter.BooleanVar(value=False)
+        self.then_spleet = tkinter.BooleanVar(value=True) # control whether the spleet will run once the youtube download occurs.
+        self.local_file_path = tkinter.StringVar() # Where to get the file to spleet.
+        self.youtube_results = []
+        self.search_term = tkinter.StringVar(value="") # The youtube search term
+        self.forgettable_elements = []
+        self.chosen_yt_result = tkinter.IntVar(0)
+        
+    def open_ui(self):
+        self.root.geometry("590x550")
+        self.root.title("Spleeter GUI by Dozza")
+        frame = tkinter.Frame(self.root)
+        tkinter.Label(self.root, text=bootlogo, justify="left", font="consolas").grid(row=0)
+        frame.grid(row=1, padx=5, pady=5)
+        tkinter.Button(frame, text="Spleet Local File", command=self.ask_local_file).pack(side=tkinter.LEFT, padx=5)
+        tkinter.Button(frame, text="Search Youtube", command=self.search_youtube).pack(side=tkinter.LEFT, padx=5)
+        ent = tkinter.Entry(frame, textvariable=self.search_term)
+        ent.bind('<Return>', self.hit_search_youtube) # now THIS is epic
+        ent.pack(side=tkinter.LEFT, padx=5)
+        ent.focus()
+        frame2 = tkinter.Frame(frame)
+        tkinter.Checkbutton(frame2, text="Open Audacity After Spleet", variable=self.open_audacity).grid(row=0)
+        tkinter.Checkbutton(frame2, text="Spleet After Youtube DL", variable=self.then_spleet).grid(row=1)
+        frame2.pack(side=tkinter.LEFT, padx=5)
+        ExitButton = tkinter.Button(frame, text="Quit", command=sys.exit)
+        ExitButton.pack(side=tkinter.TOP)
+        tkinter.Pack()
+        self.root.update()
+        self.root.deiconify()
+        self.root.mainloop()
+
+    def hit_search_youtube(self, arg):
+        self.search_youtube()
+
+    
+    def ask_local_file(self, spleet_after = True):
+        self.local_file_path.set(filedialog.askopenfilename(initialdir=os.environ["HOMEPATH"] + "/Desktop",
                                                   title="Select file",
-                                                  filetypes=(("mp3 audio", ".mp3"), ("all files", ".*")))
-            root.destroy()
-
-        if mode == "2":
-            # input the search term for VideosSearch, store the top 10 results by name and Url
-            searchterm = input("Enter search term:")
-            search = VideosSearch(searchterm, limit=10).result()["result"]
-            results = []
-            # Unpack the videosearch generator.
-            for i,x in enumerate(search):
-                results.append(x)
-
-            #parse the results of the search into useful parameters.
-            for index, result in enumerate(results):
-                print(f"    Result {index}: {result['title']}, {result['duration']}")
+                                                  filetypes=(("mp3 audio", ".mp3"), ("all files", ".*"))))
+        if spleet_after:
+            self.spleet_file(False)
 
 
-            # Choose a result.
-            while True:
-                selected_option = input("Which option would you like to pick?\n")
-                if  0 <= int(selected_option) < 10:
-                    break
-
-            selected_result = results[int(selected_option)]
-
-            # setup for youtube downloader. we can use high quality here since it is volatile and spleeter
-            ydl_opts = {
-                'format': 'bestaudio/best',
-                'postprocessors': [{
-                    'key': 'FFmpegExtractAudio',
-                    'preferredcodec': 'mp3',
-                    'preferredquality': '320',
-                }],
-                'verbose': True,
-                'outtmpl': '%(title)s.%(ext)s'
-            }
-            with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-                downloaded_filename = ydl.prepare_filename(selected_result)[:-3] + '.mp3'
-                logging.info(f"Saving file as {downloaded_filename}")
-                ydl.download([selected_result['link']])
-            # the mp3 should be present in the working directory now.
-            # get the filename 
-
-            filename = os.path.join(os.getcwd(),downloaded_filename)
-            if not os.path.isfile(filename):
-                root = Tk()
-                root.withdraw()
-                filename = filedialog.askopenfilename(initialdir=os.cwd(),
-                                                    title="Select file",
-                                                    filetypes=(("supporter audio", ".mp3 .wav "), ("all files", ".*")))
-                root.destroy()
-        #
-        logging.debug(f"Output full path: {filename}")
-        if filename is "":
-            # avoid errors when quitting the spleeter GUI
-            sys.exit(0)
-        [head, tail] = os.path.split(filename)
-        arguments = create_argument_parser().parse_args(
+    def spleet_file(self, remove_file = False):
+        warnings.filterwarnings('ignore')
+        # Do some cool shit.
+        filename = self.local_file_path.get()
+        logger.info('Spleeting')
+        logger.info(f"Local file is {self.local_file_path.get()}")
+        logger.debug(f"Output full path: {filename}")
+        [self.head, self.tail] = os.path.split(filename)
+        self.arguments = create_argument_parser().parse_args(
             ['separate', '-i', filename, '-o', 'audio_output', '-p', 'spleeter:5stems-16kHz'])
         # ok so now we add our own spicy c-c-custom code.
-        arguments.codec = tail.split(".")[1]
+        self.arguments.codec = self.tail.split(".")[1]
         # arguments.command = 'separate'
         # arguments.configuration = 'spleeter:5stems-16kHz'
         # arguments.duration = 600
-        arguments.bitrate = '256k'
-        arguments.filename_format = '{filename}/{instrument}.{codec}'
+        self.arguments.bitrate = '256k'
+        self.arguments.filename_format = '{filename}/{instrument}.{codec}'
         # arguments.offset = 0.0
         # arguments.output_path = 'audio_output'
-        arguments.verbose = True
-        logging.debug(f"Loaded {tail} from {head}")
-        logging.debug("Processing...")
+        self.arguments.verbose = True
+        logger.debug(f"Loaded {self.tail} from {self.head}")
+        logger.debug("Processing...")
         enable_logging()
-        if arguments.verbose:
-            enable_tensorflow_logging()
-        if arguments.command == 'separate':
-            from spleeter.commands.separate import entrypoint
-        params = load_configuration(arguments.configuration)
-        logging.info("Spleeting...")
-        entrypoint(arguments, params)
-        logging.info("Done!")
+        enable_tensorflow_logging()
+        params = load_configuration(self.arguments.configuration)
+        logger.info("Spleeting...")
+        entrypoint(self.arguments, params)
+        logger.info("Done!")
 
         #remove the downloaded mp3 afterwards
-        if mode == "2":
+        if remove_file:
             os.remove(filename)
 
         #pop open the output folder
-        outputdir = '"' + working[2:-1] + '\\' + arguments.output_path + '\\' + tail[0:-4] + '\\' + '"'
-        os.startfile(outputdir)
+        os.startfile('"' + self.working[2:-1] + '\\' + self.arguments.output_path + '\\' + self.tail[0:-4] + '\\' + '"')
+        if self.open_audacity.get():
+            self.open_audacity_and_import()
+        sys.exit(0)
 
+    def search_youtube(self):
+        searchterm = self.search_term.get()
+        logger.info(f"Search term is: \"{searchterm}\"")
+        search = VideosSearch(searchterm, limit=10).result()["result"]
+        results = []
+        # Unpack the videosearch generator.
+        for i,x in enumerate(search):
+            results.append(x)
+
+        #parse the results of the search into useful parameters.
+        self.youtube_results = []
+        for item in self.forgettable_elements:
+            item.pack_forget()
+            item.destroy()
+
+        self.youtube_buttons = []
+        frame = tkinter.Frame(self.root)
+        frame.grid() # see where it puts it???
+
+        Dlbutton = tkinter.Button(frame, text=f"Download and Spleet YT", command=self.download_file_from_yt)
+        Dlbutton.grid(row=0, sticky=tkinter.W)
+
+        self.forgettable_elements.append(Dlbutton)
+        self.forgettable_elements.append(frame)
+
+        for index, result in enumerate(results):
+            try:
+                self.youtube_results.append(result)
+                logger.info(f"{index}\t{result['title']} - {result['duration']} = {result['link']}")
+                rad = tkinter.Radiobutton(frame, variable=self.chosen_yt_result, value=index, text=f"{result['title']} - {result['duration']}")
+                rad.grid(sticky=tkinter.W, row=index+1)
+                self.forgettable_elements.append(rad)
+            except Exception as e:
+                logger.exception(e)
+
+        tkinter.Pack()
+
+
+
+    def download_file_from_yt(self):
+        selected_result = self.youtube_results[self.chosen_yt_result.get()]
+        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
+            downloaded_filename = ydl.prepare_filename(selected_result)[:-3] + '.mp3'
+            logger.info(f"Saving file as {downloaded_filename}")
+            ydl.download([selected_result['link']])
+            self.local_file_path.set(os.path.join(os.getcwd(),downloaded_filename))
+        if self.then_spleet.get():
+            self.spleet_file(True)
+    
+    def open_audacity_and_import(self):
         # audacity time
         os.startfile(AUDACITY_PATH)
-        if sys.platform == 'win32':
-            logging.debug("pipe-test.py, running on windows")
-            TONAME = '\\\\.\\pipe\\ToSrvPipe'
-            FROMNAME = '\\\\.\\pipe\\FromSrvPipe'
-            EOL = '\r\n\0'
-        else:
-            logging.debug("pipe-test.py, running on linux or mac")
-            TONAME = '/tmp/audacity_script_pipe.to.' + str(os.getuid())
-            FROMNAME = '/tmp/audacity_script_pipe.from.' + str(os.getuid())
-            EOL = '\n'
+        logger.debug("pipe-test.py, running on windows")
 
-        logging.debug("Write to  \"" + TONAME +"\"")
+        logger.debug("Write to  \"" + TONAME +"\"")
         while not os.path.exists(TONAME):
-            logging.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
+            logger.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
             time.sleep(1)
 
 
-        logging.debug("Read from \"" + FROMNAME +"\"")
+        logger.debug("Read from \"" + FROMNAME +"\"")
         while not os.path.exists(FROMNAME):
-            logging.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
+            logger.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
             time.sleep(1)
 
         time.sleep(5)
 
-        logging.debug("-- Both pipes exist.  Good.")
+        logger.debug("-- Both pipes exist.  Good.")
 
         TOFILE = open(TONAME, 'w')
-        logging.debug("-- File to write to has been opened")
         FROMFILE = open(FROMNAME, 'rt')
-        logging.debug("-- File to read from has now been opened too\r\n")
+        logger.debug("-- File to write to has been opened")
+        logger.debug("-- File to read from has now been opened too\r\n")
 
 
         def send_command(command):
             """Send a single command."""
-            logging.debug("Send: >>> \n"+command)
+            logger.debug("Send: >>> \n"+command)
             TOFILE.write(command + EOL)
             TOFILE.flush()
 
@@ -198,33 +247,28 @@ def main():
             """Send one command, and return the response."""
             send_command(command)
             response = get_response()
-            logging.debug("Rcvd: <<< \n" + response)
+            logger.debug("Rcvd: <<< \n" + response)
             return response
 
         
         # construct import paths for audio
-        importPath = working[2:-1] + '/' + arguments.output_path + '/' + tail[0:-4] + '/'
+        importPath = self.working[2:-1] + '/' + self.arguments.output_path + '/' + self.tail[0:-4] + '/'
         importPath = os.path.normpath(importPath)
         do_command('Import2: Filename="' + os.path.join(importPath,'bass.mp3"'))
         do_command('Import2: Filename="' + os.path.join(importPath,'vocals.mp3"'))
         do_command('Import2: Filename="' + os.path.join(importPath,'piano.mp3"'))
         do_command('Import2: Filename="' + os.path.join(importPath,'other.mp3"'))
         do_command('Import2: Filename="' + os.path.join(importPath,'drums.mp3"'))
-   
+
         # Imported!
-        logging.info("files imported successfully...")
-        sys.exit(1)
+        logger.info("files imported successfully...")
 
 
-    except SpleeterError as e:
-        get_logger().error(e)
-
-
-def entrypoint():
-    """ Command line entrypoint. """
-    warnings.filterwarnings('ignore')
-    main()
+def main():
+    # Create the class.
+    GUI = SpleeterGUI()
+    GUI.open_ui()
 
 
 if __name__ == '__main__':
-    entrypoint()
+    main()
