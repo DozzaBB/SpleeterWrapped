@@ -107,7 +107,7 @@ class SpleeterGUI:
     def ask_local_file(self, spleet_after = True):
         self.local_file_path.set(filedialog.askopenfilename(initialdir=os.environ["HOMEPATH"] + "/Desktop",
                                                   title="Select file",
-                                                  filetypes=(("mp3 audio", ".mp3"), ("all files", ".*"))))
+                                                  filetypes=(("mp3 audio", ".mp3 .wav"), ("all files", ".*"))))
         if spleet_after:
             self.spleet_file(False)
 
@@ -149,7 +149,6 @@ class SpleeterGUI:
         os.startfile('"' + self.working[2:-1] + '\\' + self.arguments.output_path + '\\' + self.tail[0:-4] + '\\' + '"')
         if self.open_audacity.get():
             self.open_audacity_and_import()
-        sys.exit(0)
 
     def search_youtube(self):
         searchterm = self.search_term.get()
@@ -228,7 +227,7 @@ class SpleeterGUI:
 
         def send_command(command):
             """Send a single command."""
-            logger.debug("Send: >>> \n"+command)
+            logger.debug("Send: >>>  "+command)
             TOFILE.write(command + EOL)
             TOFILE.flush()
 
@@ -247,18 +246,36 @@ class SpleeterGUI:
             """Send one command, and return the response."""
             send_command(command)
             response = get_response()
-            logger.debug("Rcvd: <<< \n" + response)
+            logger.debug("Rcvd: <<< " + response)
             return response
 
         
         # construct import paths for audio
         importPath = self.working[2:-1] + '/' + self.arguments.output_path + '/' + self.tail[0:-4] + '/'
         importPath = os.path.normpath(importPath)
-        do_command('Import2: Filename="' + os.path.join(importPath,'bass.mp3"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,'vocals.mp3"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,'piano.mp3"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,'other.mp3"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,'drums.mp3"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,f'vocals.{self.arguments.codec}"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,f'bass.{self.arguments.codec}"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,f'piano.{self.arguments.codec}"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,f'other.{self.arguments.codec}"'))
+        do_command('Import2: Filename="' + os.path.join(importPath,f'drums.{self.arguments.codec}"'))
+         # Select the first track for vocal split,
+        do_command('SelectTracks:')
+        do_command("SelTrackStartToEnd:")
+        # Duplicate the first track to the last track.
+        do_command('Duplicate: ')
+        do_command('SelectTracks:Mode="Set" Track="0.5" TrackCount="0.5"')
+        do_command('Silence:Use_Preset="<Factory Defaults>"')
+        do_command('SelectTracks:Mode="Set" Track="0" TrackCount="1"')
+        do_command('Stereo to Mono:')
+        do_command('Amplify:Ratio="2.0"')
+        do_command('SelectTracks:Mode="Set" Track="5" TrackCount="0.5"')
+        do_command('Silence:Use_Preset="<Factory Defaults>"')
+        do_command('SelectTracks:Mode="Set" Track="5" TrackCount="1"')
+        do_command('Stereo to Mono:')
+        do_command('Amplify:Ratio="2.0"')
+        do_command('SelectTracks:Mode="Set" Track="5" TrackCount="1"')
+        do_command("Invert:")
+        do_command("SortByName:")
 
         # Imported!
         logger.info("files imported successfully...")
