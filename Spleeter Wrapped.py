@@ -189,9 +189,18 @@ class SpleeterGUI:
         selected_result = self.youtube_results[self.chosen_yt_result.get()]
         with youtube_dl.YoutubeDL(ydl_opts) as ydl:
             downloaded_filename = ydl.prepare_filename(selected_result)[:-3] + '.mp3'
+            allowed_chars = "abcdefghijlkmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTYVWXYZ _()"
+            downloaded_head = downloaded_filename[0:-4]
+
             logger.info(f"Saving file as {downloaded_filename}")
+            new_head = "".join([x for x in downloaded_head if x in allowed_chars])
+
             ydl.download([selected_result['link']])
-            self.local_file_path.set(os.path.join(os.getcwd(),downloaded_filename))
+            # rename the unsafe file to the safe name.
+            old_fullpath = os.path.join(os.getcwd(),downloaded_filename)
+            new_fullpath = os.path.join(os.getcwd(),new_head + ".mp3")
+            os.rename(old_fullpath, new_fullpath)
+            self.local_file_path.set(new_fullpath)
         if self.then_spleet.get():
             self.spleet_file(True)
     
