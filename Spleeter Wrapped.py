@@ -18,6 +18,7 @@ from tkinter import filedialog
 from youtubesearchpython import VideosSearch
 import warnings
 import os
+import pipeclient
 from spleeter.commands.separate import entrypoint
 from spleeter.commands import create_argument_parser
 from spleeter.utils.configuration import load_configuration
@@ -53,11 +54,6 @@ ydl_opts = {
             'verbose': True,
             'outtmpl': '%(title)s.%(ext)s'
         }
-
-TONAME = '\\\\.\\pipe\\ToSrvPipe'
-FROMNAME = '\\\\.\\pipe\\FromSrvPipe'
-EOL = '\r\n\0'
-
 
 
 
@@ -200,85 +196,61 @@ class SpleeterGUI:
             self.spleet_file(True)
     
     def open_audacity_and_import(self):
-        # audacity time
-        os.startfile(AUDACITY_PATH)
-        logger.debug("pipe-test.py, running on windows")
-
-        logger.debug("Write to  \"" + TONAME +"\"")
-        while not os.path.exists(TONAME):
-            logger.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
-            time.sleep(1)
-
-
-        logger.debug("Read from \"" + FROMNAME +"\"")
-        while not os.path.exists(FROMNAME):
-            logger.error(" ..does not exist.  Ensure Audacity is running with mod-script-pipe.")
-            time.sleep(1)
-
-        time.sleep(5)
-
-        logger.debug("-- Both pipes exist.  Good.")
-
-        TOFILE = open(TONAME, 'w')
-        FROMFILE = open(FROMNAME, 'rt')
-        logger.debug("-- File to write to has been opened")
-        logger.debug("-- File to read from has now been opened too\r\n")
+        try:
+            # audacity time
+            os.startfile(AUDACITY_PATH)
+            TONAME = '\\\\.\\pipe\\ToSrvPipe'
+            FROMNAME = '\\\\.\\pipe\\FromSrvPipe'
+            logger.debug("Opening write pipe.")
+            while not os.path.exists(TONAME):
+                logger.error("Failed. Trying again in 1 sec.")
+                time.sleep(1)
 
 
-        def send_command(command):
-            """Send a single command."""
-            logger.debug("Send: >>>  "+command)
-            TOFILE.write(command + EOL)
-            TOFILE.flush()
+            logger.debug("Opening read pipe.")
+            while not os.path.exists(FROMNAME):
+                logger.error("Failed. Trying again in 1 sec.")
+                time.sleep(1)
 
-        def get_response():
-            """Return the command response."""
-            result = ''
-            line = ''
-            while True:
-                result += line
-                line = FROMFILE.readline()
-                if line == '\n' and len(result) > 0:
-                    break
-            return result
+            # Audacity takes a second idk why.
+            time.sleep(2)
+            client = pipeclient.PipeClient()
+            def do_command(string_command):
+                client.write(string_command, timer=True)
 
-        def do_command(command):
-            """Send one command, and return the response."""
-            send_command(command)
-            response = get_response()
-            logger.debug("Rcvd: <<< " + response)
-            return response
+            logger.info('client created')
 
-        
-        # construct import paths for audio
-        importPath = self.working[2:-1] + '/' + self.arguments.output_path + '/' + self.tail[0:-4] + '/'
-        importPath = os.path.normpath(importPath)
-        do_command('Import2: Filename="' + os.path.join(importPath,f'vocals.{self.arguments.codec}"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,f'bass.{self.arguments.codec}"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,f'piano.{self.arguments.codec}"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,f'other.{self.arguments.codec}"'))
-        do_command('Import2: Filename="' + os.path.join(importPath,f'drums.{self.arguments.codec}"'))
-         # Select the first track for vocal split,
-        do_command('SelectTracks:')
-        do_command("SelTrackStartToEnd:")
-        # Duplicate the first track to the last track.
-        do_command('Duplicate: ')
-        do_command('SelectTracks:Mode="Set" Track="0.5" TrackCount="0.5"')
-        do_command('Silence:Use_Preset="<Factory Defaults>"')
-        do_command('SelectTracks:Mode="Set" Track="0" TrackCount="1"')
-        do_command('Stereo to Mono:')
-        do_command('Amplify:Ratio="2.0"')
-        do_command('SelectTracks:Mode="Set" Track="5" TrackCount="0.5"')
-        do_command('Silence:Use_Preset="<Factory Defaults>"')
-        do_command('SelectTracks:Mode="Set" Track="5" TrackCount="1"')
-        do_command('Stereo to Mono:')
-        do_command('Amplify:Ratio="2.0"')
-        do_command('SelectTracks:Mode="Set" Track="5" TrackCount="1"')
-        do_command("Invert:")
-        do_command("SortByName:")
+            # construct import paths for audio
+            importPath = self.working[2:-1] + '/' + self.arguments.output_path + '/' + self.tail[0:-4] + '/'
+            importPath = os.path.normpath(importPath)
+            do_command('Import2: Filename="' + os.path.join(importPath,f'vocals.{self.arguments.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'bass.{self.arguments.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'piano.{self.arguments.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'other.{self.arguments.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'drums.{self.arguments.codec}"'))
+            # Select the first track for vocal split,
+            do_command('SelectTracks:')
+            do_command("SelTrackStartToEnd:")
+            # Duplicate the first track to the last track.
+            do_command('Duplicate: ')
+            do_command('SelectTracks:Mode="Set" Track="0.5" TrackCount="0.5"')
+            do_command('Silence:Use_Preset="<Factory Defaults>"')
+            do_command('SelectTracks:Mode="Set" Track="0" TrackCount="1"')
+            do_command('Stereo to Mono:')
+            do_command('Amplify:Ratio="2.0"')
+            do_command('SelectTracks:Mode="Set" Track="5" TrackCount="0.5"')
+            do_command('Silence:Use_Preset="<Factory Defaults>"')
+            do_command('SelectTracks:Mode="Set" Track="5" TrackCount="1"')
+            do_command('Stereo to Mono:')
+            do_command('Amplify:Ratio="2.0"')
+            do_command('SelectTracks:Mode="Set" Track="5" TrackCount="1"')
+            do_command("Invert:")
+            do_command("SortByName:")
 
-        # Imported!
-        logger.info("files imported successfully...")
+            # Imported!
+            logger.info("files imported successfully...")
+        except Exception as e:
+            logger.exception(e)
 
 
 def main():
