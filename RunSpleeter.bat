@@ -1,2 +1,2 @@
-call conda activate py36
+call venv/scripts/activate.bat
 python "spleeter wrapped.py"

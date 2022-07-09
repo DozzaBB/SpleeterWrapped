@@ -2,7 +2,7 @@ from __future__ import unicode_literals
 
 # Logging Setup
 import logging
-from unittest import result
+from re import VERBOSE
 ch = logging.StreamHandler()
 logger = logging.getLogger("prog")
 logger.addHandler(ch)
@@ -19,13 +19,9 @@ from youtubesearchpython import VideosSearch
 import warnings
 import os
 import pipeclient
-from spleeter.commands.separate import entrypoint
-from spleeter.commands import create_argument_parser
-from spleeter.utils.configuration import load_configuration
-from spleeter.utils.logging import (
-    enable_logging,
-    enable_tensorflow_logging,
-    )
+
+from spleeter.separator import Separator
+
 
 __email__ = 'research@deezer.com'
 __author__ = 'Deezer Research'
@@ -71,7 +67,7 @@ class SpleeterGUI:
         self.youtube_results = []
         self.search_term = tkinter.StringVar(value="") # The youtube search term
         self.forgettable_elements = []
-        self.chosen_yt_result = tkinter.IntVar(0)
+        self.chosen_yt_result = tkinter.IntVar(value=0)
         
     def open_ui(self):
         self.root.geometry("590x550")
@@ -109,51 +105,30 @@ class SpleeterGUI:
 
 
     def spleet_file(self, remove_file = False):
-        warnings.filterwarnings('ignore')
-        # Do some cool shit.
-        filename = self.local_file_path.get()
         logger.info('Spleeting')
-        logger.info(f"Local file is {self.local_file_path.get()}")
-        logger.debug(f"Output full path: {filename}")
+        self.output_path = 'audio_output'
+        filename = self.local_file_path.get()
+        logger.info(f"Local file is {filename}")
+        spleet_instance = Separator('spleeter:5stems-16kHz') # model descriptor points at the predownloaded model.
         [self.head, self.tail] = os.path.split(filename)
-        self.arguments = create_argument_parser().parse_args(
-            ['separate', '-i', filename, '-o', 'audio_output', '-p', 'spleeter:5stems-16kHz'])
-        # ok so now we add our own spicy c-c-custom code.
-        self.arguments.codec = self.tail.split(".")[1]
-        # arguments.command = 'separate'
-        # arguments.configuration = 'spleeter:5stems-16kHz'
-        # arguments.duration = 600
-        self.arguments.bitrate = '256k'
-        self.arguments.filename_format = '{filename}/{instrument}.{codec}'
-        # arguments.offset = 0.0
-        # arguments.output_path = 'audio_output'
-        self.arguments.verbose = True
         logger.debug(f"Loaded {self.tail} from {self.head}")
-        logger.debug("Processing...")
-        enable_logging()
-        enable_tensorflow_logging()
-        params = load_configuration(self.arguments.configuration)
-        logger.info("Spleeting...")
-        entrypoint(self.arguments, params)
-        logger.info("Done!")
-
+        self.codec = self.tail.split(".")[1]
+        spleet_instance.separate_to_file(filename, self.output_path,codec=self.codec,)
         #remove the downloaded mp3 afterwards
         if remove_file:
             os.remove(filename)
 
-        #pop open the output folder
-        os.startfile('"' + self.working[2:-1] + '\\' + self.arguments.output_path + '\\' + self.tail[0:-4] + '\\' + '"')
+        # #pop open the output folder
+        os.startfile('"' + self.working[2:-1] + '\\' + self.output_path + '\\' + self.tail[0:-4] + '\\' + '"')
         if self.open_audacity.get():
             self.open_audacity_and_import()
 
     def search_youtube(self):
         searchterm = self.search_term.get()
         logger.info(f"Search term is: \"{searchterm}\"")
-        search = VideosSearch(searchterm, limit=10).result()["result"]
-        results = []
-        # Unpack the videosearch generator.
-        for i,x in enumerate(search):
-            results.append(x)
+        a = VideosSearch(searchterm,limit=10)
+        b = a.result()
+        search = b["result"]
 
         #parse the results of the search into useful parameters.
         self.youtube_results = []
@@ -171,7 +146,7 @@ class SpleeterGUI:
         self.forgettable_elements.append(Dlbutton)
         self.forgettable_elements.append(frame)
 
-        for index, result in enumerate(results):
+        for index, result in enumerate(search):
             try:
                 self.youtube_results.append(result)
                 logger.info(f"{index}\t{result['title']} - {result['duration']} = {result['link']}")
@@ -230,13 +205,13 @@ class SpleeterGUI:
             logger.info('client created')
 
             # construct import paths for audio
-            importPath = self.working[2:-1] + '/' + self.arguments.output_path + '/' + self.tail[0:-4] + '/'
+            importPath = self.working[2:-1] + '/' + self.output_path + '/' + self.tail[0:-4] + '/'
             importPath = os.path.normpath(importPath)
-            do_command('Import2: Filename="' + os.path.join(importPath,f'vocals.{self.arguments.codec}"'))
-            do_command('Import2: Filename="' + os.path.join(importPath,f'bass.{self.arguments.codec}"'))
-            do_command('Import2: Filename="' + os.path.join(importPath,f'piano.{self.arguments.codec}"'))
-            do_command('Import2: Filename="' + os.path.join(importPath,f'other.{self.arguments.codec}"'))
-            do_command('Import2: Filename="' + os.path.join(importPath,f'drums.{self.arguments.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'vocals.{self.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'bass.{self.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'piano.{self.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'other.{self.codec}"'))
+            do_command('Import2: Filename="' + os.path.join(importPath,f'drums.{self.codec}"'))
             # Select the first track for vocal split,
             do_command('SelectTracks:')
             do_command("SelTrackStartToEnd:")
