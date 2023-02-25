@@ -2,7 +2,6 @@ from __future__ import unicode_literals
 
 # Logging Setup
 import logging
-from re import VERBOSE
 ch = logging.StreamHandler()
 logger = logging.getLogger("prog")
 logger.addHandler(ch)
@@ -12,12 +11,13 @@ logger.propagate = False
 
 import sys
 import time
-import youtube_dl
+from pytube import YouTube
+from pytube.streams import Stream
 import tkinter
 from tkinter import filedialog
 from youtubesearchpython import VideosSearch
-import warnings
 import os
+import re
 import pipeclient
 
 from spleeter.separator import Separator
@@ -39,20 +39,7 @@ bootlogo = """
       ░               ░  ░   ░  ░   ░  ░           ░  ░   ░ """
 
 AUDACITY_PATH = "C:\\Program Files (x86)\\Audacity\\audacity.exe"
-
-ydl_opts = {
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '320',
-            }],
-            'verbose': True,
-            'outtmpl': '%(title)s.%(ext)s'
-        }
-
-
-
+safe_characters = re.compile('[\w\s\.\d]')
 
 class SpleeterGUI:
     def __init__(self):
@@ -64,7 +51,7 @@ class SpleeterGUI:
         self.open_audacity = tkinter.BooleanVar(value=False)
         self.then_spleet = tkinter.BooleanVar(value=True) # control whether the spleet will run once the youtube download occurs.
         self.local_file_path = tkinter.StringVar() # Where to get the file to spleet.
-        self.youtube_results = []
+        self.youtube_results = list[str]
         self.search_term = tkinter.StringVar(value="") # The youtube search term
         self.forgettable_elements = []
         self.chosen_yt_result = tkinter.IntVar(value=0)
@@ -112,7 +99,7 @@ class SpleeterGUI:
         spleet_instance = Separator('spleeter:5stems-16kHz') # model descriptor points at the predownloaded model.
         [self.head, self.tail] = os.path.split(filename)
         logger.debug(f"Loaded {self.tail} from {self.head}")
-        self.codec = self.tail.split(".")[1]
+        self.codec = "mp3"
         spleet_instance.separate_to_file(filename, self.output_path,codec=self.codec,)
         #remove the downloaded mp3 afterwards
         if remove_file:
@@ -126,9 +113,7 @@ class SpleeterGUI:
     def search_youtube(self):
         searchterm = self.search_term.get()
         logger.info(f"Search term is: \"{searchterm}\"")
-        a = VideosSearch(searchterm,limit=10)
-        b = a.result()
-        search = b["result"]
+        search = VideosSearch(searchterm,limit=10).result()["result"]
 
         #parse the results of the search into useful parameters.
         self.youtube_results = []
@@ -162,20 +147,12 @@ class SpleeterGUI:
 
     def download_file_from_yt(self):
         selected_result = self.youtube_results[self.chosen_yt_result.get()]
-        with youtube_dl.YoutubeDL(ydl_opts) as ydl:
-            downloaded_filename = ydl.prepare_filename(selected_result)[:-3] + '.mp3'
-            allowed_chars = "abcdefghijlkmnopqrstuvwxyz1234567890ABCDEFGHIJKLMNOPQRSTYVWXYZ _()"
-            downloaded_head = downloaded_filename[0:-4]
-
-            logger.info(f"Saving file as {downloaded_filename}")
-            new_head = "".join([x for x in downloaded_head if x in allowed_chars])
-
-            ydl.download([selected_result['link']])
-            # rename the unsafe file to the safe name.
-            old_fullpath = os.path.join(os.getcwd(),downloaded_filename)
-            new_fullpath = os.path.join(os.getcwd(),new_head + ".mp3")
-            os.rename(old_fullpath, new_fullpath)
-            self.local_file_path.set(new_fullpath)
+        link = selected_result["link"]
+        audio_stream: Stream = YouTube(link).streams.filter(only_audio=True, file_extension="webm" ).order_by("bitrate").first()
+        safe_filename = audio_stream.default_filename
+        audio_stream.download() # place in working directory.
+        # output file path is pre-made here.
+        self.local_file_path.set(safe_filename)
         if self.then_spleet.get():
             self.spleet_file(True)
     
