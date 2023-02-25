@@ -7,7 +7,12 @@ acquire via:
 * `python -m venv venv`
 * `venv/Scripts/Activate`
 * `pip install -r requirements.txt`
+* install python 3.10
+* `python -m venv venv`
+* `venv/Scripts/Activate`
+* `pip install -r requirements.txt`
 
+<!-- * pipe client from https://github.com/audacity/audacity/edit/master/scripts/piped-work/pipeclient.py
 <!-- * pipe client from https://github.com/audacity/audacity/edit/master/scripts/piped-work/pipeclient.py
 * conda create --name py36 python=3.6
 * clone this repo into your conda env
