@@ -41,11 +41,13 @@ bootlogo = """
 AUDACITY_PATH = "C:\\Program Files (x86)\\Audacity\\audacity.exe"
 safe_characters = re.compile('[\w\s\.\d]')
 
+
 class SpleeterGUI:
     def __init__(self):
         # You cant have tkinter Variables without fucking intantiating tkinter first...
         self.root = tkinter.Tk()
         self.root.withdraw()
+        self.status = tkinter.StringVar(self.root, "Ready.")
         # Init all the damn variables.
         self.working = str((os.getcwdb()))
         self.open_audacity = tkinter.BooleanVar(value=False)
@@ -57,13 +59,15 @@ class SpleeterGUI:
         self.chosen_yt_result = tkinter.IntVar(value=0)
         
     def open_ui(self):
-        self.root.geometry("590x550")
+        self.root.geometry("590x600")
         self.root.title("Spleeter GUI by Dozza")
         frame = tkinter.Frame(self.root)
         tkinter.Label(self.root, text=bootlogo, justify="left", font="consolas").grid(row=0)
         frame.grid(row=1, padx=5, pady=5)
         tkinter.Button(frame, text="Spleet Local File", command=self.ask_local_file).pack(side=tkinter.LEFT, padx=5)
         tkinter.Button(frame, text="Search Youtube", command=self.search_youtube).pack(side=tkinter.LEFT, padx=5)
+        tkinter.Label(self.root, textvariable=self.status, justify="left", font="consolas").grid(padx=5, pady=1)
+
         ent = tkinter.Entry(frame, textvariable=self.search_term)
         ent.bind('<Return>', self.hit_search_youtube) # now THIS is epic
         ent.pack(side=tkinter.LEFT, padx=5)
@@ -87,65 +91,90 @@ class SpleeterGUI:
         self.local_file_path.set(filedialog.askopenfilename(initialdir=os.environ["HOMEPATH"] + "/Desktop",
                                                   title="Select file",
                                                   filetypes=(("mp3 audio", ".mp3 .wav"), ("all files", ".*"))))
+        if self.local_file_path.get() is '':
+            return self.status.set("Try selecting a file :/")
         if spleet_after:
             self.spleet_file(False)
 
+    def status_from_error(self, e):
+        error_str = str(e)
+        error_parts = [x for x in error_str.split("\n") if x != '']
+        try:
+            error = "\n".join(error_parts[0:1])
+        except IndexError:
+            error = error_parts[0]
+        self.status.set(f"Failed: {error}")
+        self.root.update()
+
 
     def spleet_file(self, remove_file = False):
-        logger.info('Spleeting')
-        self.output_path = 'audio_output'
-        filename = self.local_file_path.get()
-        logger.info(f"Local file is {filename}")
-        spleet_instance = Separator('spleeter:5stems-16kHz') # model descriptor points at the predownloaded model.
-        [self.head, self.tail] = os.path.split(filename)
-        logger.debug(f"Loaded {self.tail} from {self.head}")
-        self.codec = "mp3"
-        spleet_instance.separate_to_file(filename, self.output_path,codec=self.codec,)
-        #remove the downloaded mp3 afterwards
-        if remove_file:
-            os.remove(filename)
+        try:
+            self.status.set("Spleeting local file")
+            self.root.update()
+            logger.info('Spleeting')
+            self.output_path = 'audio_output'
+            filename = self.local_file_path.get()
+            logger.info(f"Local file is {filename}")
+            spleet_instance = Separator('spleeter:5stems-16kHz') # model descriptor points at the predownloaded model.
+            [self.head, self.tail] = os.path.split(filename)
+            logger.debug(f"Loaded {self.tail} from {self.head}")
+            self.codec = "mp3"
+            spleet_instance.separate_to_file(filename, self.output_path,codec=self.codec,)
+            #remove the downloaded mp3 afterwards
+            if remove_file:
+                os.remove(filename)
 
-        # #pop open the output folder
-        os.startfile('"' + self.working[2:-1] + '\\' + self.output_path + '\\' + self.tail[0:-4] + '\\' + '"')
-        if self.open_audacity.get():
-            self.open_audacity_and_import()
+            # #pop open the output folder
+            os.startfile('"' + self.working[2:-1] + '\\' + self.output_path + '\\' + self.tail[0:-4] + '\\' + '"')
+            if self.open_audacity.get():
+                self.open_audacity_and_import()
+            self.status.set("Ready.")
+        except Exception as e:
+            self.status_from_error(e)
 
     def search_youtube(self):
-        searchterm = self.search_term.get()
-        logger.info(f"Search term is: \"{searchterm}\"")
-        search = VideosSearch(searchterm,limit=10).result()["result"]
+        try:
+            self.status.set("Searching youtube")
+            self.root.update()
+            searchterm = self.search_term.get()
+            logger.info(f"Search term is: \"{searchterm}\"")
+            search = VideosSearch(searchterm,limit=10).result()["result"]
 
-        #parse the results of the search into useful parameters.
-        self.youtube_results = []
-        for item in self.forgettable_elements:
-            item.pack_forget()
-            item.destroy()
+            #parse the results of the search into useful parameters.
+            self.youtube_results = []
+            for item in self.forgettable_elements:
+                item.pack_forget()
+                item.destroy()
 
-        self.youtube_buttons = []
-        frame = tkinter.Frame(self.root)
-        frame.grid() # see where it puts it???
+            self.youtube_buttons = []
+            frame = tkinter.Frame(self.root)
+            frame.grid() # see where it puts it???
 
-        Dlbutton = tkinter.Button(frame, text=f"Download and Spleet YT", command=self.download_file_from_yt)
-        Dlbutton.grid(row=0, sticky=tkinter.W)
+            Dlbutton = tkinter.Button(frame, text=f"Download and Spleet YT", command=self.download_file_from_yt)
+            Dlbutton.grid(row=0, sticky=tkinter.W)
 
-        self.forgettable_elements.append(Dlbutton)
-        self.forgettable_elements.append(frame)
+            self.forgettable_elements.append(Dlbutton)
+            self.forgettable_elements.append(frame)
 
-        for index, result in enumerate(search):
-            try:
-                self.youtube_results.append(result)
-                logger.info(f"{index}\t{result['title']} - {result['duration']} = {result['link']}")
-                rad = tkinter.Radiobutton(frame, variable=self.chosen_yt_result, value=index, text=f"{result['title']} - {result['duration']}")
-                rad.grid(sticky=tkinter.W, row=index+1)
-                self.forgettable_elements.append(rad)
-            except Exception as e:
-                logger.exception(e)
+            for index, result in enumerate(search):
+                try:
+                    self.youtube_results.append(result)
+                    logger.info(f"{index}\t{result['title']} - {result['duration']} = {result['link']}")
+                    rad = tkinter.Radiobutton(frame, variable=self.chosen_yt_result, value=index, text=f"{result['title']} - {result['duration']}")
+                    rad.grid(sticky=tkinter.W, row=index+1)
+                    self.forgettable_elements.append(rad)
+                except Exception as e:
+                    logger.exception(e)
 
-        tkinter.Pack()
-
+            tkinter.Pack()
+            self.status.set("Youtube results fetched.")
+        except Exception as e:
+            self.status_from_error(e)
 
 
     def download_file_from_yt(self):
+        self.status.set("Downloading from youtube")
+        self.root.update()
         selected_result = self.youtube_results[self.chosen_yt_result.get()]
         link = selected_result["link"]
         audio_stream: Stream = YouTube(link).streams.filter(only_audio=True, file_extension="webm" ).order_by("bitrate").first()
